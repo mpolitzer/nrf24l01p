@@ -1,6 +1,8 @@
 #include <stdint.h>
-#include "nrf24l01p.h"
-#include "nrf24l01p_reg.h"
+#include "nrf24l01.h"
+#include "nrf24l01_reg.h"
+
+#define apply_bitmask(p, m, v) ((p) = ((p) & ~(m)) | ((v) & (m)))
 
 #ifndef MIN
 #define MIN(_a, _b) ((_a) < (_b) ? (_a) : (_b))
@@ -11,29 +13,21 @@
 #endif
 
 /* ========================================================================== */
-/* platform specific functions. */
+static void    nrf24l01h_w(uint8_t reg, uint8_t v);
+static void    nrf24l01h_wm(uint8_t reg, uint8_t m, uint8_t v);
+static uint8_t nrf24l01h_r(uint8_t reg);
 
-/* SS enable | write/status | write | SS disable. */
-void
-nrfw(uint8_t reg, uint8_t value);
+void nrf24l01p_init(uint8_t istx, uint8_t power) {
+	nrf24l01h_hw_init();
+}
 
-/* SS enable |  status |  reg | SS disable. */
-uint8_t
-nrfr(uint8_t reg);
+void nrf24l01_init(uint8_t tx) {
+	uint8_t cfg = 1<<EN_CRC | 1<<CRCO | 1<<PWR_UP;
 
-/* SS enable |  write[size]  | SS disable */
-void
-nrfwv(uint8_t reg, const uint8_t *buf, uint8_t size);
+	nrf24l01_w(CONFIG, cfg);
+}
 
-/* SS enable |   read[size]  | SS disable */
-void
-nrfrv(uint8_t reg, uint8_t *buf, uint8_t size);
-
-/* gpio edge IRQ. */
-void nrf24l01p_service_irq(void);
-
-/* ========================================================================== */
-
+#if 0
 /* receiver or transmiter? */
 void nrf24l01p_init(uint8_t istx, uint8_t power) {
 	/* Enable CRC with 2 bytes and power device up */
@@ -48,11 +42,13 @@ void nrf24l01p_init(uint8_t istx, uint8_t power) {
 	nrfw(EN_RXADDR, (1<<ERX_P0)); /* Pipe0 Enable. */
 	nrfw(SETUP_AW, (1<<AW)); /* 5bytes address. */
 }
+#endif
 
-uint8_t nrf24l01p_status(void) {
-	return nrfr(STATUS);
+uint8_t nrf24l01_status(void) {
+	return nrf24l01h_r(STATUS);
 }
 
+#if 0
 /* up to 32bytes. */
 void nrf24l01p_send(const uint8_t *p, uint8_t size) {
 	nrfwv(W_TX_PAYLAOD, p, MIN(size, 32));
@@ -76,4 +72,20 @@ uint8_t nrf24l01p_set_rx_adress_pipe(uint8_t num, const uint8_t address[5]) {
 	if (num > 5) return 1;
 	nrfwv(RX_ADDR_P0 + num, adress, 5);
 	return 0;
+}
+#endif
+
+/* ========================================================================== */
+static void nrf24l01h_w(uint8_t reg, uint8_t v) {
+	nrf24l01h_wv(reg, &v, 1);
+}
+
+static uint8_t nrf24l01h_r(uint8_t reg) {
+	uint8_t v;
+	nrf24l01h_rv(reg, &v, 1);
+	return v;
+}
+
+static void nrf24l01h_wm(uint8_t reg, uint8_t m, uint8_t v) {
+	nrf24l01h_w(reg, (nrf24l01h_r(reg) & ~m) | (v&m));
 }
